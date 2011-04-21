@@ -67,13 +67,11 @@ if(!-d $base) {
 }
 
 
-# ========================================================
-# = Decide what to do, and do it. Easier said than done. =
-# ========================================================
+# =======================================
+# = Switch through commands/sub_command =
+# =======================================
 
-# Switch is apparently a core module, not a regular construct, and can't be loaded on www
-# for some reason.
-# I'll use an else if structure to be ultra safe. It will look messy, no getting around it.
+# TODO: Refactor this to use a better structure
 
 # cores (Show cores from base)
 if ($command eq 'cores') {
@@ -119,26 +117,23 @@ if ($command eq 'cores') {
     pod2usage( -verbose => 1 );
 }
 
-# =====================================================
-# = Command routines run from the elsif routine above =
-# =====================================================
+# =====================
+# = Command Functions =
+# =====================
 
-# Return an array of cores
-# @base = cu_drupal base
+# Returns an array of cores
 sub cores {
     my @dirlist = dirlist(catdir($base, "cores"));
     return @dirlist;
 }
 
-# Return and array of sites
-# @base = cu_drupal base
+# Returns an array of sites
 sub dists {
     my @dirlist = dirlist(catdir($base, "dists"));
     return @dirlist;
 }
 
-# Return information for a particular site
-# @base = cu_drupal base
+# Returns information for a particular site
 sub site_info {
     my $cwd = cwd();
     if(is_drupal_base($cwd)) {
@@ -146,7 +141,8 @@ sub site_info {
         my $dist = first_link_name(File::Spec->catfile($cwd, 'sites'));
         print "Site: $core ($dist)\n";
     } else {
-        print "You are not in a drupal base folder\n";
+        printf "%s is not a drupal site folder\n", $cwd;
+        exit(1);
     }
 }
 
@@ -305,8 +301,8 @@ sub switch_dist {
 # = Helpers =
 # ===========
 
-# Return an array of files in a directory.
-# @dir = directory to return list from
+# Returns an array of files in a directory.
+# @dir = directory to return the list for
 sub dirlist {
     # Validate this
     my $dir = shift(@_);
@@ -320,7 +316,7 @@ sub dirlist {
 }
 
 
-# Return the basename of the first link found
+# Returns the basename of the first link found
 sub first_link_basename {
     my $path = canonpath(shift(@_));
     if(!-d $path) { print "nope"; return 0; }
@@ -345,7 +341,7 @@ sub first_link_basename {
     return 0;
 }
 
-# Return the filename (last path name) of the first link found
+# Returns the filename (last path name) of the first link found
 sub first_link_name {
     my $path = canonpath(shift(@_));
     if(!-d $path) { print "nope"; return 0; }
@@ -366,8 +362,8 @@ sub first_link_name {
 }
 
 # is_drupal_base will check for certain attributes to determine if the base folder
-# is a drupal base folder
-# @path - it takes a path argument
+# is a drupal core
+# @path - Directory to check
 sub is_drupal_base {
     my $path = canonpath(shift(@_));
     $path = realpath($path);
@@ -476,7 +472,8 @@ sub is_int {
   return ($val =~ m/^\d+$/);
 }
 
-# This functionality isn't in Perl, this wont check variablel type very well, but will work for this script
+# Determine if an item is in an array. It probably wont check type very well, this script will
+# only use it to check for strings in an array
 # use: in_array(@names, 'bryan');
 # returns a boolean
 sub in_array {
