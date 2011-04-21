@@ -1,0 +1,519 @@
+#!/usr/bin/perl -w
+
+use strict;
+use File::Spec::Functions;
+use Getopt::Long;
+use Pod::Usage;
+use Cwd 'abs_path', 'realpath', 'cwd';
+
+## SET THE VERSION ##
+my $VERSION = "0.1.5";
+
+
+# ===================
+# = Options Parsing =
+# ===================
+
+# Declare opt parse vars
+my $cli_base = 0;
+my $cli_version = 0;
+my $cli_help = 0;
+
+# Define command line options
+GetOptions(
+    'base=s' => \$cli_base, 
+    'version!' => \$cli_version, 
+    'help' => \$cli_help
+);
+
+# See if we need to print the version
+if($cli_version) {
+    print "cu_drupal(cud) Version: $VERSION\n";
+    exit(0);
+}
+
+# If --help print usage
+pod2usage( { -verbose => 1, -exitval => 0 } ) if ( $cli_help );
+
+# Get the remaining ARGV's as command and sub_command
+# After GetOptions parses its options, we can test
+# to see if we have a command and sub_command left
+my $command = (@ARGV) ? shift(@ARGV) : '';
+my $sub_command = (@ARGV) ? shift(@ARGV) : '';
+
+# Load the CUDRUPAL_BASE environment variables
+# This is the location on the server where the cu_drupal base git repo
+# is checked out
+# TODO: More validation here, what if they didn't set base in ENV or on the CLI,
+# check that the base path actually exists
+my $base = '';
+if($cli_base) {
+    $base = $cli_base;
+} else {
+    $base = $ENV{'DRUPAL_BASE'};
+}
+
+# Warn if we don't have  base
+if(!$base) {
+    print "You must tell cud where the cu_drupal base is:\nYou may either set the CUDRUPAL_BASE environment variable, or use the --base command line option.\n";
+    exit(1);
+}
+
+$base = realpath($base);
+
+if(!-d $base) {
+    print "The base path doesn't exist\n";
+    exit(1);
+}
+
+
+# ========================================================
+# = Decide what to do, and do it. Easier said than done. =
+# ========================================================
+
+# Switch is apparently a core module, not a regular construct, and can't be loaded on www
+# for some reason.
+# I'll use an else if structure to be ultra safe. It will look messy, no getting around it.
+
+# cores (Show cores from base)
+if ($command eq 'cores') {
+    # Cores
+    my @cores = cores();
+    foreach my $f (@cores) { print $f . "\n"; }
+
+# dists (Show dists from base)
+} elsif ($command eq 'dists') {
+    # Dists
+    my @dists = dists();
+    foreach my $f (@dists) { print $f . "\n"; }
+
+# Site Commands
+} elsif ($command eq 'site') {
+    # Site sub-commands
+
+    # New Site
+    if($sub_command eq 'new') {
+        site_new();
+
+    # Switch Core
+    } elsif ($sub_command eq 'switch-core') { 
+        switch_core();
+
+    # Switch Dist
+    } elsif ($sub_command eq 'switch-dist') {
+        switch_dist();
+
+    # Switch ( Runs switch_core() and switch_dist() )
+    } elsif($sub_command eq 'switch') {
+        switch_core();
+        switch_dist();
+
+    # Default sites sub
+    } else {
+        site_info();
+    }
+
+# Default
+} else {
+    # Print Usage Statement
+    pod2usage( -verbose => 1 );
+}
+
+# =====================================================
+# = Command routines run from the elsif routine above =
+# =====================================================
+
+# Return an array of cores
+# @base = cu_drupal base
+sub cores {
+    my @dirlist = dirlist(catdir($base, "cores"));
+    return @dirlist;
+}
+
+# Return and array of sites
+# @base = cu_drupal base
+sub dists {
+    my @dirlist = dirlist(catdir($base, "dists"));
+    return @dirlist;
+}
+
+# Return information for a particular site
+# @base = cu_drupal base
+sub site_info {
+    my $cwd = cwd();
+    if(is_drupal_base($cwd)) {
+        my $core = first_link_basename($cwd);
+        my $dist = first_link_name(File::Spec->catfile($cwd, 'sites'));
+        print "Site: $core ($dist)\n";
+    } else {
+        print "You are not in a drupal base folder\n";
+    }
+}
+
+# Create a new site
+# @dest = destination directory for the new site
+sub site_new {
+    if(!scalar(@ARGV) >= 1) {
+        print "Please supply site destination\n";
+        exit(1);
+    } else {
+        # Pull our site destination
+        my $dest = shift(@ARGV);
+        # Try to load the core and dist from ARGV, if they aren't set here
+        # the user will be prompted interactively
+        my $core = shift(@ARGV);
+        my $dist = shift(@ARGV);
+        
+        # Check the destination
+        $dest = realpath($dest);
+        my $dest_sites = File::Spec->catfile($dest, 'sites');
+        
+        # Validate the destination path, if it exists, bail
+        if(-x $dest) {
+            print "This path already exists\n";
+            exit(1);
+        }
+        
+        # Load core and dist, the subs continue asking until you
+        # give a valid answer
+        if(!$core) { $core = choose_core(); }
+        if(!$dist) { $dist = choose_dist($core); }
+        
+        # Check core and dist
+        # Uses our in_array from helpers, and pulls the cores and dists from
+        # our functions.
+        if(!in_array(cores(), $core) || !in_array(dists(), $dist)) {
+            print "Invalid core or dist\n";
+            exit(1);
+        }
+        
+        # Get the paths for the core and dist chosen
+        my $core_path = File::Spec->catfile($base, 'cores', $core);
+        my $dist_path = File::Spec->catfile($base, 'dists', $dist);
+        my $core_rel = File::Spec->abs2rel($core_path, $dest);
+        # This one is realtive from the sites folder in dest
+        my $dist_rel = File::Spec->abs2rel($dist_path, $dest_sites);
+        
+        # Make our two directories
+        mkdir($dest);
+        mkdir($dest_sites);
+        
+        # Create the sites all folder linked to the dist chosen
+        symlink($dist_rel, File::Spec->catfile($dest_sites, 'all'));
+        
+        # Open the core path to walk through the files in the directory
+        # relatively link all of them, except sites, to the dest dir
+        opendir(DIR,$core_path);
+        my @core_files = readdir(DIR);
+        foreach my $f (@core_files) {
+            # Make sure we aren't the dir stuff and ignore the sites folder
+            if($f ne '.' && $f ne '..' && $f ne 'sites') {
+                my $tmp_rel = File::Spec->abs2rel("$core_path/$f", "$dest/");
+                symlink($tmp_rel, $dest . "/$f");
+            }
+        }
+        closedir(DIR);
+    }
+}
+
+# Switch the drupal core of a site folder
+sub switch_core {
+    my $dest = realpath(Cwd->cwd());
+
+    # Make sure we already have a drupal base
+    if(!is_drupal_base($dest)) { 
+        print "You are not in a drupal base folder\n";
+        exit(1);
+    }
+    
+    # Try to load the core from ARGV, if they aren't set here
+    # the user will be prompted interactively
+    my $core = shift(@ARGV);
+    
+    # What core are we currently on
+    my $current_core = first_link_basename($dest);
+    # Get a core and set some paths
+    if(!$core) { $core = choose_core(); }
+    # Validate the core
+    if(!in_array(cores(), $core)) {
+        print "Invalid core\n";
+        exit(1);
+    }
+    my $core_path = File::Spec->catfile($base, 'cores', $core);
+
+    # First remove all links
+    remove_all_links($dest);
+
+    # Iterate through the new core and create links in the destination folder
+    opendir(DIR,$core_path);
+    my @core_files = readdir(DIR);
+    foreach my $f (@core_files) {
+        # Make sure we aren't the dir stuff and ignore the sites folder
+        if($f ne '.' && $f ne '..' && $f ne 'sites') {
+            my $tmp_rel = File::Spec->abs2rel("$core_path/$f", "$dest/");
+            # This should not be necessary, yet here it is, just in case
+            if(-e "$dest/$f") { unlink("$dest/$f"); }
+            #print "Linking: $dest/$f\n";
+            symlink($tmp_rel, "$dest/$f");
+        }
+    }
+    closedir(DIR);
+}
+
+
+# Switch the drupal dist of a site folder
+sub switch_dist {
+    my $dest = realpath(Cwd->cwd());
+    # Try to load the dist from ARGV, if they aren't set here
+    # the user will be prompted interactively
+    my $dist = shift(@ARGV);
+    
+    my $link_dest = File::Spec->catfile($dest, 'sites');
+    
+    # Make sure we already have a drupal base
+    if(!is_drupal_base($dest)) { 
+        print "You are not in a drupal base folder\n";
+        exit(1);
+    }
+
+    # What core are we currently on, this will be used as the filter
+    my $current_core = first_link_basename($dest);
+
+    # Pick a new dist using the current core as the filter
+    if(!$dist) { $dist = choose_dist($current_core); }
+
+    if(!in_array(dists(), $dist)) {
+        print "Invalid dist\n";
+        exit(1);
+    }
+    
+    ## TODO: Validate the chosen dist with the current core version
+    
+    # Set the full path to the distribution source
+    my $dist_path = File::Spec->catfile($base, 'dists', $dist);
+
+    # Sites/all sholud be a link, if so, remove it
+    if(readlink("$link_dest/all")) { unlink("$link_dest/all"); }
+    
+    # Find the relative path and link it
+    my $rel_link = File::Spec->abs2rel($dist_path, $link_dest);
+    # Create the symlink
+    symlink($rel_link, "$link_dest/all");
+}
+
+# ===========
+# = Helpers =
+# ===========
+
+# Return an array of files in a directory.
+# @dir = directory to return list from
+sub dirlist {
+    # Validate this
+    my $dir = shift(@_);
+    my @out = ();
+    my @dir = glob(canonpath($dir) . "/*");
+    foreach my $f (@dir) {
+        (my $v, my $d, my $f) = File::Spec->splitpath($f);
+        push(@out, $f);
+    }
+    return @out;
+}
+
+
+# Return the basename of the first link found
+sub first_link_basename {
+    my $path = canonpath(shift(@_));
+    if(!-d $path) { print "nope"; return 0; }
+    my @dirlist = glob($path . "/*");
+    foreach my $f (@dirlist) {
+        if(readlink($f)) {
+            my $link = readlink($f);
+            my $abs = File::Spec->rel2abs($link, $path);
+            my $real_path = canonpath(realpath($abs));
+            
+            # Parse the path into volume, directory, and filename
+            (my $v, my $d, my $filename) = File::Spec->splitpath($real_path);
+        
+            # Split the directory path
+            # canonpath will remove the trailing /
+            my @dir_chunks = File::Spec->splitdir(canonpath($d));
+            # Return the basename of the containing directory
+            return $dir_chunks[-1];
+        }
+    }
+    # Default to returning false
+    return 0;
+}
+
+# Return the filename (last path name) of the first link found
+sub first_link_name {
+    my $path = canonpath(shift(@_));
+    if(!-d $path) { print "nope"; return 0; }
+    my @dirlist = glob($path . "/*");
+    foreach my $f (@dirlist) {
+        if(readlink($f)) {
+            my $link = readlink($f);
+            my $abs = File::Spec->rel2abs($link, $path);
+            my $real_path = canonpath(realpath($abs));
+            # Cores and Dists should be directories
+            next if(!-d $real_path);
+            (my $v, my $d, my $filename) = File::Spec->splitpath($real_path);
+            # Return the filename, which will actually be the directory name
+            return $filename;
+        }
+    }
+    return 0;
+}
+
+# is_drupal_base will check for certain attributes to determine if the base folder
+# is a drupal base folder
+# @path - it takes a path argument
+sub is_drupal_base {
+    my $path = canonpath(shift(@_));
+    $path = realpath($path);
+    # Default to passing, see if we can knock it down
+    my $check = 1;
+    # Is there an .htaccess file
+    if(!-f File::Spec->catfile($path, '.htaccess')) { $check = 0; }
+    # Drupal 6x and 7x contain a CHANGELOG.txt file in their root
+    if(!-f File::Spec->catfile($path, 'CHANGELOG.txt')) { $check = 0; }
+    # It should have a sites folder
+    if(!-d File::Spec->catfile($path, 'sites')) { $check = 0; }
+    # It should have a modules folder
+    if(!-d File::Spec->catfile($path, 'modules')) { $check = 0; }
+    return $check;
+}
+
+# Choose a core
+# Returns a core string or false
+sub choose_core {
+    my @cores = cores($base);
+    
+    for(my $i=0; defined $cores[$i]; $i++) {
+        my $core_name = $cores[$i];
+        print $i + 1 . ". $core_name\n";
+    }
+
+    print "Please chose a core: ";
+    my $return = <>;
+    if(is_int($return) && $cores[int($return)-1]) {
+        return $cores[int($return)-1];
+    } else {
+        print "You made an invalid choice.\n";
+        exit(100);
+    }
+}
+
+# Choose a distribution
+# Returns a distribution string or false
+sub choose_dist {
+
+    # If a filter argument is passed in
+    # parse the version number out of it.
+    # The filter expects something like drupal-6.20, or drupal-7.0
+    my $filter = shift(@_);
+    my $version_check = '';
+
+    # See if we're filtering dists by major version
+    if($filter) {
+        # Search for the version in the string, should be in the format
+        # drupal-7.123 (we would get 7 back from that example)
+        # Someone may want to check over this regex, but this should work into
+        # version 10+
+        if ( my @version_match = ($filter =~ m/-(\d+)\./g) ) {
+            $version_check = $version_match[0];
+        }
+    }
+    
+    # Get a list of our dists
+    my @dists = dists($base);
+    
+    # If we have a version from filter, splice anything
+    # not beginning with that version number out of the possible
+    # dists returned
+    if($version_check) {
+        # Only include versions that start with the version we're filtering for
+        @dists = grep {$_ =~ m/^$version_check/ } @dists;
+    }
+
+    # Present the dist list to the user and get a response
+    for(my $i=0; defined $dists[$i]; $i++) {
+        my $dist_name = $dists[$i];
+        print $i + 1 . ". $dist_name\n";
+    }
+
+    print "Please chose a distribution: ";
+    my $return = <>;
+    if(is_int($return) && $dists[int($return)-1]) {
+        return $dists[int($return)-1];
+    } else {
+        print "You made an invalid choice.\n";
+        exit(100);
+    }
+}
+
+# Remove all links in a directory
+# @dir to remove all links from
+sub remove_all_links {
+    my $dir = shift(@_);
+    opendir(DIR,$dir);
+    my @files = readdir(DIR);
+    foreach my $f (@files) {
+        # Make sure we aren't the dir stuff and ignore the sites folder
+        if(readlink($f)) { unlink($f); }
+    }
+    closedir(DIR);
+}
+
+# ===================
+# = For Convenience =
+# ===================
+
+# Determines if something is an integer
+# Returns a boolean
+sub is_int {
+  my $val = shift;
+  return ($val =~ m/^\d+$/);
+}
+
+# This functionality isn't in Perl, this wont check variablel type very well, but will work for this script
+# use: in_array(@names, 'bryan');
+# returns a boolean
+sub in_array {
+    my $item = pop();
+    my @array = @_;
+    foreach my $i (@array) {
+        if($i eq $item) { return 1; }
+    }
+    return 0;
+}
+
+__END__
+
+=head1 NAME
+
+drlm commands
+
+=head1 SYNOPSIS
+
+drlm COMMAND [--help] [--base] [--dir]
+
+=head1 DESCRIPTION
+
+Our Description
+
+=head1 OPTIONS
+
+=item B<--help>
+
+Print this message
+
+=item B<--base>
+
+Define the location of the base folder containg the Drupal cores and your dists
+
+=item B<--dir>
+
+Define the location of the base folder containg the Drupal cores and your dists
+
+=cut
