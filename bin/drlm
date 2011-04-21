@@ -477,11 +477,11 @@ sub is_int {
 # use: in_array(@names, 'bryan');
 # returns a boolean
 sub in_array {
-    my $item = pop();
-    my @array = @_;
-    foreach my $i (@array) {
-        if($i eq $item) { return 1; }
-    }
+    my $check_for = pop;
+    my @array_to_check = @_;
+    # Return true if we find the value in the array
+    return 1 if( grep { $_ =~ m/$check_for/ } @array_to_check );
+    # Default to returning false
     return 0;
 }
 
