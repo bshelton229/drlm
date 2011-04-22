@@ -35,17 +35,13 @@ if($cli_version) {
 # If --help print usage
 pod2usage( { -verbose => 1, -exitval => 0 } ) if ( $cli_help );
 
-# Get the remaining ARGV's as command and sub_command
-# After GetOptions parses its options, we can test
-# to see if we have a command and sub_command left
+# Get the remaining ARGV's as command and sub_command.
+# After GetOptions parses its options we can test
+# to see if we have a command and sub_command left.
 my $command = (@ARGV) ? shift(@ARGV) : '';
 my $sub_command = (@ARGV) ? shift(@ARGV) : '';
 
-# Load the CUDRUPAL_BASE environment variables
-# This is the location on the server where the cu_drupal base git repo
-# is checked out
-# TODO: More validation here, what if they didn't set base in ENV or on the CLI,
-# check that the base path actually exists
+# Load the DRUPAL_BASE environment variable
 my $base = '';
 if($cli_base) {
     $base = $cli_base;
@@ -53,16 +49,17 @@ if($cli_base) {
     $base = $ENV{'DRUPAL_BASE'};
 }
 
-# Warn if we don't have  base
+# Make sure a base has been set
 if(!$base) {
-    print "You must tell cud where the cu_drupal base is:\nYou may either set the CUDRUPAL_BASE environment variable, or use the --base command line option.\n";
+    print "You must tell drlm where the drupal base is:\nYou may either set the DRUPAL_BASE environment variable, or use the --base command line option.\n";
     exit(1);
 }
 
 $base = realpath($base);
 
+# Make sure the base exists
 if(!-d $base) {
-    print "The base path doesn't exist\n";
+    printf "The base path %s doesn't exist\n", $base;
     exit(1);
 }
 
