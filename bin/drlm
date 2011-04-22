@@ -64,54 +64,23 @@ if(!-d $base) {
 }
 
 
-# =======================================
-# = Switch through commands/sub_command =
-# =======================================
+# ============================================================
+# = Evaluate $command and $sub_command and decide what to do =
+# ============================================================
 
-# TODO: Refactor this to use a better structure
-
-# cores (Show cores from base)
-if ($command eq 'cores') {
-    # Cores
-    my @cores = cores();
-    foreach my $f (@cores) { print $f . "\n"; }
-
-# dists (Show dists from base)
-} elsif ($command eq 'dists') {
-    # Dists
-    my @dists = dists();
-    foreach my $f (@dists) { print $f . "\n"; }
-
-# Site Commands
-} elsif ($command eq 'site') {
-    # Site sub-commands
-
-    # New Site
-    if($sub_command eq 'new') {
-        site_new();
-
-    # Switch Core
-    } elsif ($sub_command eq 'switch-core') { 
-        switch_core();
-
-    # Switch Dist
-    } elsif ($sub_command eq 'switch-dist') {
-        switch_dist();
-
-    # Switch ( Runs switch_core() and switch_dist() )
-    } elsif($sub_command eq 'switch') {
-        switch_core();
-        switch_dist();
-
-    # Default sites sub
-    } else {
-        site_info();
-    }
-
-# Default
-} else {
-    # Print Usage Statement
-    pod2usage( -verbose => 1 );
+COMMAND: for ($command) {
+    /cores/  && do { print_cores(); last COMMAND; };
+    /dists/ && do { print_dists(); last COMMAND; };
+    /site/ && do {
+        SITE_COMMAND: for ($sub_command) {
+            /new/ && do { site_new(); last SITE_COMMAND; };
+            /switch-core/ && do { switch_core(); last SITE_COMMAND; };
+            /switch-dist/ && do { switch_dist(); last SITE_COMMAND; };
+            /switch/ && do { switch_core(); switch_dist(); last SITE_COMMAND; };
+            do { site_info(); };
+        };
+    last COMMAND; };
+    do { pod2usage( -verbose => 1 ); };
 }
 
 # =====================
@@ -128,6 +97,18 @@ sub cores {
 sub dists {
     my @dirlist = dirlist(catdir($base, "dists"));
     return @dirlist;
+}
+
+# Print the cores
+sub print_cores {
+    my @cores = cores();
+    foreach my $f (@cores) { print $f . "\n"; }
+}
+
+# Print the dists
+sub print_dists {
+    my @dists = dists();
+    foreach my $f (@dists) { print $f . "\n"; }
 }
 
 # Returns information for a particular site
