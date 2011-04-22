@@ -28,7 +28,7 @@ GetOptions(
 
 # See if we need to print the version
 if($cli_version) {
-    print "cu_drupal(cud) Version: $VERSION\n";
+    print "drlm Version: $VERSION\n";
     exit(0);
 }
 
