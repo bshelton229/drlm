@@ -471,7 +471,7 @@ drlm commands
 
 =head1 SYNOPSIS
 
-drlm COMMAND [--help] [--base] [--dir]
+drlm COMMAND [--base] [--help] [--version]
 
 =head1 DESCRIPTION
 
@@ -479,16 +479,16 @@ Our Description
 
 =head1 OPTIONS
 
-=item B<--help>
+=item --help
 
 Print this message
 
-=item B<--base>
+=item --base
 
 Define the location of the base folder containg the Drupal cores and your dists
 
-=item B<--dir>
+=item --version
 
-Define the location of the base folder containg the Drupal cores and your dists
+Prints the drlm version
 
 =cut
