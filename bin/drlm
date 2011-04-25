@@ -2,6 +2,7 @@
 
 use strict;
 use File::Spec::Functions;
+use File::Copy;
 use Getopt::Long;
 use Pod::Usage;
 use Cwd 'abs_path', 'realpath', 'cwd';
@@ -18,12 +19,14 @@ my $VERSION = "0.1.1";
 my $cli_base = 0;
 my $cli_version = 0;
 my $cli_help = 0;
+my $create_sites_default = 0;
 
 # Define command line options
 GetOptions(
-    'base=s' => \$cli_base, 
-    'version!' => \$cli_version, 
-    'help' => \$cli_help
+    'base=s' => \$cli_base,
+    'version!' => \$cli_version,
+    'help' => \$cli_help,
+    'create-sites-default' => \$create_sites_default
 );
 
 # See if we need to print the version
@@ -187,6 +190,14 @@ sub site_new {
             }
         }
         closedir(DIR);
+        
+        # Create sites/default stuff
+        if($create_sites_default) {
+            my $new_sites_default_folder = File::Spec->catfile($dest, 'sites', 'default');
+            mkdir( $new_sites_default_folder );
+            mkdir( $new_sites_default_folder . "/files" );
+            copy( "$core_path/sites/default/default.settings.php", "$new_sites_default_folder/default.settings.php" );            
+        }   
     }
 }
 
@@ -482,7 +493,7 @@ drlm commands
 
 =head1 SYNOPSIS
 
-drlm COMMAND [--base] [--help] [--version]
+drlm COMMAND [--base] [--help] [--version] [--create-sites-default]
 
 =head1 DESCRIPTION
 
@@ -501,5 +512,9 @@ Define the location of the base folder containg the Drupal cores and your dists
 =item --version
 
 Prints the drlm version
+
+=item --create-sites-default
+
+When set, site new ./dest will create the sites/default folder with default.settings.php in it and an emptpy files folder.
 
 =cut
