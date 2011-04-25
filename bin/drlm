@@ -57,9 +57,9 @@ if(!$base) {
 
 $base = realpath($base);
 
-# Make sure the base exists
-if(!-d $base) {
-    printf "The base path %s doesn't exist\n", $base;
+# Check the base folder
+if( !check_base($base) ) {
+    printf "The base path %s doesn't exist or does not contain dists and cores folders\n", $base;
     exit(1);
 }
 
@@ -356,6 +356,17 @@ sub is_drupal_base {
     # It should have a modules folder
     if(!-d File::Spec->catfile($path, 'modules')) { $check = 0; }
     return $check;
+}
+
+# Check drupal_base
+# Make sure it at least contains dists and cores directories
+sub check_base {
+    my $check_base = shift;
+    if(-d "$check_base/dists" && -d "$check_base/cores") {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
 # Choose a core
