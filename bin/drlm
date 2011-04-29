@@ -1,5 +1,8 @@
 #!/usr/bin/perl -w
 
+# Author: Bryan Shelton, University Communications, University of Colorado Boulder
+# License: MIT
+
 use strict;
 use File::Spec::Functions;
 use File::Copy;
