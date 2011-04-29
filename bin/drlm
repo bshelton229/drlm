@@ -1,7 +1,11 @@
 #!/usr/bin/perl -w
 
-# Author: Bryan Shelton, University Communications, University of Colorado Boulder
-# License: MIT
+#
+# drlm -- A perl script to manage a drupal symlink structure
+#
+# Copyright (c) 2011 Bryan Shelton, University of Colorado Boulder
+# <http://github.com/bshelton229/drlm>
+#
 
 use strict;
 use File::Spec::Functions;
