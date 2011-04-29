@@ -8,7 +8,7 @@ use Pod::Usage;
 use Cwd 'abs_path', 'realpath', 'cwd';
 
 ## SET THE VERSION ##
-my $VERSION = "0.1.1";
+my $VERSION = "0.1.2";
 
 
 # ===================
@@ -20,6 +20,8 @@ my $cli_base = 0;
 my $cli_version = 0;
 my $cli_help = 0;
 my $create_sites_default = 0;
+
+## Usage documentation is at the end of this file ##
 
 # Define command line options
 GetOptions(
@@ -146,8 +148,8 @@ sub site_new {
         my $dest_sites = File::Spec->catfile($dest, 'sites');
         
         # Validate the destination path, if it exists, bail
-        if(-x $dest) {
-            print "This path already exists\n";
+        if(-x $dest && !dir_is_empty($dest)) {
+            printf "%s already exists and is not empty\n", $dest;
             exit(1);
         }
         
@@ -483,6 +485,23 @@ sub in_array {
     return 1 if( grep { $_ =~ m/$check_for/ } @array_to_check );
     # Default to returning false
     return 0;
+}
+
+# Determine whether a directory is empty
+# user dir_is_empty("/tmp");
+# returns boolean
+sub dir_is_empty {
+    my ($path) = @_;
+    opendir DIR, $path;
+    while(my $entry = readdir DIR) {
+        # . and .. are always going to be there
+        next if($entry =~ /^\.\.?$/);
+        closedir DIR;
+        return 0;
+    }
+    closedir DIR;
+    return 1;
+
 }
 
 __END__
