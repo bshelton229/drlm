@@ -15,7 +15,7 @@ use Pod::Usage;
 use Cwd 'abs_path', 'realpath', 'cwd';
 
 ## SET THE VERSION ##
-my $VERSION = "0.1.2";
+my $VERSION = "0.1.3";
 
 
 # ===================
@@ -27,6 +27,7 @@ my $cli_base = 0;
 my $cli_version = 0;
 my $cli_help = 0;
 my $create_sites_default = 0;
+my $skip_dir_check = 0;
 
 ## Usage documentation is at the end of this file ##
 
@@ -35,7 +36,8 @@ GetOptions(
     'base=s' => \$cli_base,
     'version!' => \$cli_version,
     'help' => \$cli_help,
-    'create-sites-default' => \$create_sites_default
+    'create-sites-default' => \$create_sites_default,
+    'skip-dir-check' => \$skip_dir_check
 );
 
 # See if we need to print the version
@@ -155,7 +157,7 @@ sub site_new {
         my $dest_sites = File::Spec->catfile($dest, 'sites');
         
         # Validate the destination path, if it exists, bail
-        if(-x $dest && !dir_is_empty($dest)) {
+        if(-x $dest && !dir_is_empty($dest) && !$skip_dir_check) {
             printf "%s already exists and is not empty\n", $dest;
             exit(1);
         }
