@@ -217,7 +217,7 @@ sub switch_core {
     my $dest = realpath(Cwd->cwd());
 
     # Make sure we already have a drupal base
-    if(!is_drupal_base($dest)) { 
+    if(!is_drupal_base($dest) && !$skip_dir_check) { 
         print "You are not in a drupal base folder\n";
         exit(1);
     }
@@ -267,7 +267,7 @@ sub switch_dist {
     my $link_dest = File::Spec->catfile($dest, 'sites');
     
     # Make sure we already have a drupal base
-    if(!is_drupal_base($dest)) { 
+    if(!is_drupal_base($dest) && !$skip_dir_check) { 
         print "You are not in a drupal base folder\n";
         exit(1);
     }
