@@ -43,7 +43,7 @@ GetOptions(
     'version!' => \$cli_version,
     'help' => \$cli_help,
     'create-sites-default' => \$create_sites_default,
-	'skip-dir-check' => \$skip_dir_check
+    'skip-dir-check' => \$skip_dir_check
 );
 
 # See if we need to print the version
@@ -163,7 +163,7 @@ sub site_new {
         my $dest_sites = File::Spec->catfile($dest, 'sites');
         
         # Validate the destination path, if it exists, bail
-        if(-x $dest && !dir_is_empty($dest) %% !$skip_dir_check) {
+        if(-x $dest && !dir_is_empty($dest) && !$skip_dir_check) {
             printf "%s already exists and is not empty\n", $dest;
             exit(1);
         }
