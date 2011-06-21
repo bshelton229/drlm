@@ -1,5 +1,4 @@
 #!/usr/bin/perl -w
-
 #
 # drlm -- A perl script to manage a drupal symlink structure
 #
@@ -17,6 +16,13 @@ use Cwd 'abs_path', 'realpath', 'cwd';
 ## SET THE VERSION ##
 my $VERSION = "0.1.3";
 
+## Which OS is this running on? ##
+my $os = $^O;
+if(1){
+	print "\nThis file only works on Windows (MSWin32) or Linux (linux).\n";
+	print "Your Operating System is: ".$os."\n";
+	exit(0);
+}
 
 # ===================
 # = Options Parsing =
@@ -37,7 +43,7 @@ GetOptions(
     'version!' => \$cli_version,
     'help' => \$cli_help,
     'create-sites-default' => \$create_sites_default,
-    'skip-dir-check' => \$skip_dir_check
+	'skip-dir-check' => \$skip_dir_check
 );
 
 # See if we need to print the version
@@ -157,7 +163,7 @@ sub site_new {
         my $dest_sites = File::Spec->catfile($dest, 'sites');
         
         # Validate the destination path, if it exists, bail
-        if(-x $dest && !dir_is_empty($dest) && !$skip_dir_check) {
+        if(-x $dest && !dir_is_empty($dest) %% !$skip_dir_check) {
             printf "%s already exists and is not empty\n", $dest;
             exit(1);
         }
@@ -187,7 +193,18 @@ sub site_new {
         mkdir($dest_sites);
         
         # Create the sites all folder linked to the dist chosen
-        symlink($dist_rel, File::Spec->catfile($dest_sites, 'all'));
+		my $temp_dest = File::Spec->catfile($dest_sites, 'all');
+		if($os eq "MSWin32"){
+			$temp_dest =~ s!\/!\\!g;
+			$dist_rel =~ s!\/!\\!g;
+			if(-f $dist_rel){
+				system("mklink $temp_dest $dist_rel");
+			} elsif(-d $dist_rel){
+				system("mklink /D $temp_dest $dist_rel");
+			}
+		} elsif($os eq "linux"){
+			symlink($dist_rel, File::Spec->catfile($dest_sites, 'all'));	
+		}
         
         # Open the core path to walk through the files in the directory
         # relatively link all of them, except sites, to the dest dir
@@ -197,7 +214,18 @@ sub site_new {
             # Make sure we aren't the dir stuff and ignore the sites folder
             if($f ne '.' && $f ne '..' && $f ne 'sites') {
                 my $tmp_rel = File::Spec->abs2rel("$core_path/$f", "$dest/");
-                symlink($tmp_rel, $dest . "/$f");
+                #symlink($tmp_rel, $dest . "/$f");
+				if($os eq "MSWin32"){
+					$tmp_rel =~ s!\/!\\!g;
+					$dest =~ s!\/!\\!g;
+					if (-f $tmp_rel) {
+						system("mklink $dest\\$f $tmp_rel");
+					} elsif(-d $tmp_rel) {
+						system("mklink /D $dest\\$f $tmp_rel");
+					}
+				} elsif($os eq "linux"){
+					symlink($dist_rel, File::Spec->catfile($dest_sites, 'all'));	
+				}
             }
         }
         closedir(DIR);
@@ -216,7 +244,7 @@ sub site_new {
 sub switch_core {
     my $dest = realpath(Cwd->cwd());
 
-    # Make sure we already have a drupal base
+    # Make sure we already have a drupal base, all your base are belong to us
     if(!is_drupal_base($dest) && !$skip_dir_check) { 
         print "You are not in a drupal base folder\n";
         exit(1);
@@ -250,7 +278,16 @@ sub switch_core {
             # This should not be necessary, yet here it is, just in case
             if(-e "$dest/$f") { unlink("$dest/$f"); }
             #print "Linking: $dest/$f\n";
-            symlink($tmp_rel, "$dest/$f");
+			if($os eq "MSWin32"){
+				$tmp_rel =~ s!\/!\\!g;
+				if (-f $tmp_rel) {
+					system("mklink $dest\\$f $tmp_rel");
+				} elsif(-d $tmp_rel){
+					system("mklink /D $dest\\$f $tmp_rel");
+				}
+			} elsif($os eq "linux") {
+				symlink($tmp_rel, "$dest/$f");
+			}
         }
     }
     closedir(DIR);
@@ -294,7 +331,17 @@ sub switch_dist {
     # Find the relative path and link it
     my $rel_link = File::Spec->abs2rel($dist_path, $link_dest);
     # Create the symlink
-    symlink($rel_link, "$link_dest/all");
+	if($os eq "MSWin32"){
+		$rel_link =~ s!\/!\\!g;
+		$link_dest =~ s!\/!\\!g;
+		if(-f $rel_link){
+			system("mklink $link_dest\\all $rel_link");
+		} elsif(-d $rel_link){
+			system("mklink /D $link_dest\\all $rel_link");
+		}
+	} elsif($os eq "linux"){
+		symlink($rel_link, "$link_dest/all");
+	}
 }
 
 # ===========
